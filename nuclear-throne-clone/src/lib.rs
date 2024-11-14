@@ -10,6 +10,8 @@ turbo::cfg! {r#"
 
 // setup the game state
 turbo::init! {
+
+
     struct GameState{
         // game
         frame: u32,
@@ -92,6 +94,8 @@ turbo::go! ({
         state.initialized = true;
         log!("DEBUG: {}", state.initialized);
         state.save();
+
+        log!("audio running...");
         return;
     }
 

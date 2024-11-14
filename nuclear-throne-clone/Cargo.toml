@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+audio-generator = "0.1.0-alpha.1"
+imp = "0.1.0"
 turbo = { version = "*", package = "turbo-genesis-sdk" }
 
 [lib]
