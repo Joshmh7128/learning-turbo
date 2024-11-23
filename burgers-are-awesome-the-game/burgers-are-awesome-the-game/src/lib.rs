@@ -54,13 +54,9 @@ turbo::go!({
         num = u32::try_from_slice(&file.contents).unwrap_or(0);
     }
 
-    // log!("{}", num);
-
-    // log!("{}", num);
     // if we have not initialized
     if (!state.initialized && num != 0)
     {
-
         // number!
         os::client::exec("burgers-are-awesome-the-game", "random", &[]);
 
@@ -178,25 +174,37 @@ unsafe extern "C" fn random_number() -> usize {
 
 #[export_name = "turbo/get-player-num"]
 unsafe extern "C" fn get_player_num() -> usize {
-    let tp = 0;
+    let mut tp = 0;
 
     let file_path = "last player";
 
     let mut last_player = os::server::read_or!(u32, "last player", 0);
     // if the last player is 0 then become player 1
-    if (last_player == 0)
-    {
-        
+    if (last_player == 0) {
+        tp = 1;
+    } else if (last_player == 1) {
+        tp = 2;
+    } else if (last_player == 2) {
+        tp = 3;
     }
 
-    let Ok(_) = os::server::write!(&file_path, ) else {
+    let Ok(_) = os::server::write!(&file_path, tp) else {
         return os::server::CANCEL;
     };
 
-    let nt = format!("{}", num);
+    return os::server::COMMIT;
+    
+}
 
-    // log the num
-    os::server::log(&nt);
+#[export_name = "turbo/reset-player"]
+unsafe extern "C" fn reset_player_num() -> usize {
+    let mut tp = 0;
+
+    let file_path = "last player";
+
+    let Ok(_) = os::server::write!(&file_path, tp) else {
+        return os::server::CANCEL;
+    };
 
     return os::server::COMMIT;
     
