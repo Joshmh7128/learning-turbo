@@ -1,0 +1,1 @@
+C:\Users\joshm\Documents\Turbo\learning-turbo\burgers-are-awesome-the-game\burgers-are-awesome-the-game\target\wasm32-unknown-unknown\release\burgers_are_awesome_the_game.wasm: C:\Users\joshm\Documents\Turbo\learning-turbo\burgers-are-awesome-the-game\burgers-are-awesome-the-game\src\lib.rs
