@@ -135,6 +135,28 @@ turbo::go! ({
         false
     }
 
+    // checks to see if there is a rect at a specific position
+    fn collider_check(x: &f32, y: &f32, state: &mut GameState) -> bool
+    {
+        // start by saying there is no collision
+        let col = false;
+        state.collision_rects.retain_mut(|_rect|
+        {
+            // check if the given X is in between the _rect's x and the rx + w
+            // and if the given y is in between the _rect's y and the ry + h
+            if (x > &_rect.x)
+            {
+                
+            }
+
+            // then keep it in the rects
+            true
+        });
+
+        // then return the function
+        col
+    }
+
     if (collision_check(&(input.0 as f32), &(input.1 as f32)) == false)
     {
         state.player_x += input.0;
@@ -165,6 +187,17 @@ turbo::go! ({
             flip_x = state.player_x_last_vel < 0.0
         );
     }
+
+    // create a new collision rect
+    let testRect = CollisionRect {
+        x: 100 as f32,
+        y: 100 as f32,
+        w: 10 as f32,
+        h: 10 as f32
+    };
+
+    // then add it to the collision rects
+    state.collision_rects.push(testRect);
 
     state.frame += 1;
     state.save();
