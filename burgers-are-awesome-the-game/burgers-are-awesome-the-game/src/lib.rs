@@ -33,7 +33,10 @@ turbo::init! {
         start_frame: u32,
         current_char: u32,
         last_wrong_time: u32,
-        last_right_time: u32
+        last_right_time: u32,
+        show_menu: bool,
+        menu_x: u32,
+        menu_y: u32
     } = {
         Self { // when we define the struct we put the default values here
         frame: 0,
@@ -51,7 +54,10 @@ turbo::init! {
         start_frame: 0,
         current_char: 0,
         last_wrong_time: 0,
-        last_right_time: 0
+        last_right_time: 0,
+        show_menu: false,
+        menu_x: 20,
+        menu_y: 100
         }
     }
 }
@@ -208,16 +214,17 @@ turbo::go!({
             {
                 log!("sending current order...");
                 // pick a random recipe
-                let i = rand() % state.menu.len() as u32;
-                let menu_bytes = state.menu[i as usize].name.try_to_vec().unwrap();
-
-                os::client::exec(program_id, "submit-current-order", &menu_bytes);
+                let mut i = rand() % (state.menu.len()) as u32;
+                log!("{}", i);
+                // i -= 1;
+                let current_order_bytes = state.menu[i as usize].name.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-order", &current_order_bytes);
             }
 
             // if we have a current order then log one
             if (current_order_from_server != "".to_string())
             {
-                log!("order sending: ");
+                log!("order found: ");
                 log!("{}", current_order_from_server);
             }
 
@@ -298,17 +305,31 @@ turbo::go!({
 
     clear!(0xe7b84eff);
 
+    // set menu positions
+    if (state.show_menu)
+    {
+        if (state.menu_y > 120)
+        {
+            state.menu_y -= 1;
+        }
+    } else if (state.menu_y < 290) {
+        state.menu_y += 1;
+    }
+
+    // draw the menu background
+    rect!(w = 180, h = 110, x = state.menu_x - 10, y = state.menu_y - 10, color = 0xcb5917ff);
+    rect!(w = 170, h = 100, x = state.menu_x - 5, y = state.menu_y - 5, color = 0x993800ff);
+
     // draw the menu
-    let menux = 100;
-    let menuy = 100;
-    text!("Menu", x = menux, y = menuy);
+    text!("Tasty Menu", x = state.menu_x, y = state.menu_y, font = Font::XL);
     for i in 0..state.menu.len()
     {
         let item = &state.menu[i];
-        text!(&item.name, x = menux, y = menuy + ((i+1)*10));
-        text!(&item.arrows, x = menux + 50, y = menuy + ((i+1)*10));
+        text!(&item.name, x = state.menu_x, y = state.menu_y + ((i+1)*10 + 10) as u32, font = Font::L);
+        text!(&item.arrows, x = state.menu_x + 100, y = state.menu_y + ((i+1)*10 + 10) as u32, font = Font::L);
     }
 
+   
     // draw the current order
     let co = current_order_from_server.to_string();
     text!("Current Order:", x = 20, y = 10, font = Font::XL);
@@ -348,12 +369,10 @@ turbo::go!({
 
         // clear!
         if gamepad(0).a.just_pressed() {
+            log!("reset");
             state.current_inputs.clear();
             state.current_char = 0;
 
-        }
-
-        if gamepad(0).b.just_pressed() {            
             // reset score
             let j = 0;
             let j_bytes = j.try_to_vec().unwrap();
@@ -361,6 +380,14 @@ turbo::go!({
             let i = 0;
             let p_bytes = i.try_to_vec().unwrap();
             os::client::exec(program_id, "submit-current-player", &p_bytes);
+
+            let current_order_bytes = "".try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-current-order", &current_order_bytes);
+        }
+
+        // use the b button to open and close the menu
+        if gamepad(0).y.just_pressed() {
+            state.show_menu = !state.show_menu;
         }
     }
 
