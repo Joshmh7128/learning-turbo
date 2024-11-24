@@ -75,6 +75,7 @@ turbo::go!({
     let active_player = os::client::watch_file(program_id, "current player").data;
     let mut active_player_from_server = 0 as u32; 
 
+
     if let Some(file) = active_player {
         active_player_from_server = u32::try_from_slice(&file.contents).unwrap_or(0);
     }
@@ -89,6 +90,15 @@ turbo::go!({
 
     if let Some(file) = rand_data {
         num = u32::try_from_slice(&file.contents).unwrap_or(0);
+    }
+
+
+    // our score
+    let current_score = os::client::watch_file(program_id, "current score").data;
+    let mut active_score_from_server = 0 as u32;
+
+    if let Some(file) = current_score {
+        active_score_from_server = u32::try_from_slice(&file.contents).unwrap_or(0 as u32);
     }
 
     // our current order
@@ -114,6 +124,7 @@ turbo::go!({
     // if we're not playing yet, set our player based on key inputs, where left is 1, up is 2, right is 3, down is reset
     if (!state.is_playing)
     {
+
         // 1, 2, 3
         if gamepad(0).left.pressed() { state.player_num = 1;}
         if gamepad(0).up.pressed() { state.player_num = 2; }
@@ -126,11 +137,7 @@ turbo::go!({
             // now make it so that we are playing
             state.is_playing = true;
             state.start_frame = state.frame;
-        } else if (state.player_num == 0) {
-            let i = 0;
-            let p_bytes = i.try_to_vec().unwrap();
-            os::client::exec(program_id, "submit-current-player", &p_bytes);
-        }
+        } 
     }
 
     // if we have not initialized
@@ -339,6 +346,17 @@ turbo::go!({
         if gamepad(0).a.just_pressed() {
             state.current_inputs.clear();
             state.current_char = 0;
+
+        }
+
+        if gamepad(0).b.just_pressed() {            
+            // reset score
+            let j = 0;
+            let j_bytes = j.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-current-score", &j_bytes);
+            let i = 0;
+            let p_bytes = i.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-current-player", &p_bytes);
         }
     }
 
@@ -347,7 +365,12 @@ turbo::go!({
     // log!("{}", val.sin().to_string());
     text!(r"\/ MAKE THE FOOD \/", x = 200, y = (120 + (val.sin() * 2.0) as u32), color = 0xff5e00ff, font = Font::XL);
     text!(&state.current_inputs.to_string(), x = 200, y = 150, color = 0xff5e00ff, font = Font::XL);
-    text!(&state.current_char.to_string(), x = 200, y = 160, color = 0xff5e00ff, font = Font::XL);
+    // text!(&state.current_char.to_string(), x = 200, y = 160, color = 0xff5e00ff, font = Font::XL);
+
+    // draw the score 
+    text!("SCORE:", x = 380, y = 10, color = 0xff5e00ff, font = Font::XL);
+    text!(&active_score_from_server.to_string(), x = 480, y = 10, color = 0xff5e00ff, font = Font::XL);
+
     // check if this input is correct
     // player 1
     if state.player_num == 1 as i32 && state.current_char >= 2
@@ -414,11 +437,18 @@ turbo::go!({
         {
             let i = 1;
             let p_bytes = i.try_to_vec().unwrap();
+
+            let j = active_score_from_server + 1;
+            let j_bytes = j.try_to_vec().unwrap();
+            
             os::client::exec(program_id, "submit-current-player", &p_bytes);
+            log!("A");
+            os::client::exec(program_id, "submit-current-score", &j_bytes);
+            log!("B");
             
             state.current_inputs.clear();
             state.current_char = 0;
-        }
+        } 
     }
 
     // at the end of the frame save the state
@@ -489,3 +519,19 @@ unsafe extern "C" fn send_current_player() -> usize {
 
     return os::server::COMMIT;
 }
+
+#[export_name = "turbo/submit-current-score"]
+unsafe extern "C" fn submit_current_score() -> usize {
+    let score = os::server::command!(u32);
+    let file_path = format!("current score");
+
+    os::server::log("this");
+
+    let Ok(_) = os::server::write!(&file_path, score) else {
+        return os::server::CANCEL;
+    };
+
+    return os::server::COMMIT;
+}
+
+
