@@ -36,7 +36,8 @@ turbo::init! {
         last_right_time: u32,
         show_menu: bool,
         menu_x: u32,
-        menu_y: u32
+        menu_y: u32,
+        remaining_time: u32
     } = {
         Self { // when we define the struct we put the default values here
         frame: 0,
@@ -57,13 +58,14 @@ turbo::init! {
         last_right_time: 0,
         show_menu: false,
         menu_x: 20,
-        menu_y: 100
+        menu_y: 100,
+        remaining_time: 60
         }
     }
 }
 
 turbo::go!({
-    let program_id = "burgers-are-awesome-the-sequel";
+    let program_id = "dawn-of-the-final-burger";
 
     // load in the game state
     let mut state = GameState::load();
@@ -75,12 +77,45 @@ turbo::go!({
 
     let rand_data = os::client::watch_file(program_id, "random num").data;
 
+    if let Some(file) = rand_data {
+        num = u32::try_from_slice(&file.contents).unwrap_or(0);
+    }
 
     // all the food
+    // hamburger
     let hamburger_data = os::client::watch_file(program_id, "send recipe hamburger").data;
     let mut hamburger_food_from_server = Food {arrows: "".to_string(), name: "".to_string()};
+    if let Some(file) = hamburger_data {
+        hamburger_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
+    }
+
+    // double burger
     let double_data = os::client::watch_file(program_id, "send recipe double").data;
     let mut double_food_from_server = Food {arrows: "".to_string(), name: "".to_string()};
+    if let Some(file) = double_data {
+        double_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
+    }
+
+    // cheeseburger
+    let cheeseburger_data = os::client::watch_file(program_id, "send recipe cheeseburger").data;
+    let mut cheeseburger_food_from_server = Food {arrows: "".to_string(), name: "".to_string()};
+    if let Some(file) = cheeseburger_data {
+        cheeseburger_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
+    }
+
+    // french fries
+    let fries_data = os::client::watch_file(program_id, "send recipe french_fries").data;
+    let mut fries_food_from_server = Food {arrows: "".to_string(), name: "".to_string()};
+    if let Some(file) = fries_data {
+        fries_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
+    }
+
+    // milkshakes
+    let shake_data = os::client::watch_file(program_id, "send recipe shake").data;
+    let mut shake_food_from_server = Food {arrows: "".to_string(), name: "".to_string()};
+    if let Some(file) = shake_data {
+        shake_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
+    }
 
     let active_player = os::client::watch_file(program_id, "current player").data;
     let mut active_player_from_server = 0 as u32; 
@@ -90,18 +125,14 @@ turbo::go!({
         active_player_from_server = u32::try_from_slice(&file.contents).unwrap_or(0);
     }
 
-    if let Some(file) = hamburger_data {
-        hamburger_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
-    }
 
-    if let Some(file) = double_data {
-        double_food_from_server = Food::try_from_slice(&file.contents).unwrap_or(Food {arrows: "".to_string(), name: "".to_string()});
-    }
+    // our time
+    let current_time = os::client::watch_file(program_id, "remaining time").data;
+    let mut remaining_time_from_server = 0 as u32;
 
-    if let Some(file) = rand_data {
-        num = u32::try_from_slice(&file.contents).unwrap_or(0);
+    if let Some(file) = current_time {
+        remaining_time_from_server = u32::try_from_slice(&file.contents).unwrap_or(0);
     }
-
 
     // our score
     let current_score = os::client::watch_file(program_id, "current score").data;
@@ -150,12 +181,15 @@ turbo::go!({
         } 
     }
 
-    // if we have not initialized
-    if (!state.initialized && num != 0 && state.is_playing)
+    if (num == 0)
     {
         // number!
         os::client::exec(program_id, "random", &[]);
+    }
 
+    // if we have not initialized
+    if (!state.initialized && num != 0 && state.is_playing)
+    {
         // take the number and make it a string then slice the string
         let snum: String = num.to_string(); // to bum >:D
 
@@ -190,7 +224,7 @@ turbo::go!({
             state.menu.push(hamburger);
             
             // create random orders
-            // hamburger
+            // double
             let double = Food {
                 // arrows
                 arrows: arrow_gen(6, &mut state, &2),
@@ -207,7 +241,60 @@ turbo::go!({
             os::client::exec(program_id, "submit-recipe", &food_bytes);
             // add it to the menu
             state.menu.push(double);
+           
+            // cheeseburger
+            let cheeseburger = Food {
+                // arrows
+                arrows: arrow_gen(6, &mut state, &3),
+                // name
+                name: String::from("cheeseburger")
+            };
 
+            // now log the hamburger
+            log!("{}", cheeseburger.name);
+            log!("{}", cheeseburger.arrows);
+
+            let food_bytes = cheeseburger.try_to_vec().unwrap();
+
+            // now that we have our recipes, send them to the server for others to read
+            os::client::exec(program_id, "submit-recipe", &food_bytes);
+            // add it to the menu
+            state.menu.push(cheeseburger);
+
+            // fries
+            let fries = Food {
+                // arrows
+                arrows: arrow_gen(6, &mut state, &4),
+                // name
+                name: String::from("french_fries")
+            };
+
+            // now log the hamburger
+            log!("{}", fries.name);
+            log!("{}", fries.arrows);
+
+            let food_bytes = fries.try_to_vec().unwrap();
+            // now that we have our recipes, send them to the server for others to read
+            os::client::exec(program_id, "submit-recipe", &food_bytes);
+            // add it to the menu
+            state.menu.push(fries);
+
+            // milkshake
+            let shake = Food {
+                // arrows
+                arrows: arrow_gen_shake(6, &mut state, &0),
+                // name
+                name: String::from("shake")
+            };
+
+            // now log the hamburger
+            log!("{}", shake.name);
+            log!("{}", shake.arrows);        
+            let food_bytes = shake.try_to_vec().unwrap();
+            // now that we have our recipes, send them to the server for others to read
+            os::client::exec(program_id, "submit-recipe", &food_bytes);
+            // save it to our menu
+            state.menu.push(shake);    
 
             // if we don't have a current recipe, set one up
             if (state.menu.len() > 0 && current_order_from_server == "".to_string() && state.player_num == 1)
@@ -227,6 +314,11 @@ turbo::go!({
                 log!("order found: ");
                 log!("{}", current_order_from_server);
             }
+
+            // send in our remaining time
+            let i = 60 as u32;
+            let t = i.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-remaining-time", &t);
 
             // now we're initialized
             state.initialized = true;
@@ -254,6 +346,24 @@ turbo::go!({
                     state.menu.push(double_food_from_server);
                 }
 
+                // if it doesn't contain it, add it
+                if !state.menu.contains(&cheeseburger_food_from_server)
+                {
+                    state.menu.push(cheeseburger_food_from_server);
+                }
+
+                // if it doesn't contain it, add it
+                if !state.menu.contains(&fries_food_from_server)
+                {
+                    state.menu.push(fries_food_from_server);
+                }
+
+                // if it doesn't contain it, add it
+                if !state.menu.contains(&shake_food_from_server)
+                {
+                    state.menu.push(shake_food_from_server);
+                }
+
                 for i in 0..state.menu.len()
                 {
                     log!("{}",state.menu[i].name);
@@ -273,6 +383,20 @@ turbo::go!({
             }
 
         }
+    }
+
+    // make sure we have a current order baby doll
+    if (state.initialized && current_order_from_server == "".to_string())
+    {
+        log!("sending current order...");
+        log!("{}", current_order_from_server);
+        // pick a random recipe
+        let mut i = rand() % (state.menu.len()) as u32;
+        log!("{}", i);
+        // i -= 1;
+        let current_order_bytes = state.menu[i as usize].name.try_to_vec().unwrap();
+        os::client::exec(program_id, "submit-current-order", &current_order_bytes);
+    
     }
 
     // gives us a random arrow string
@@ -299,9 +423,46 @@ turbo::go!({
         if i + add == 10 {s.push_str(&state.right);}
         if i + add == 11 {s.push_str(&state.down);}
         if i + add == 12 {s.push_str(&state.up);}
+        if i + add == 13 {s.push_str(&state.left);}
+        if i + add == 14 {s.push_str(&state.right);}
+        if i + add == 15 {s.push_str(&state.down);}
+        if i + add == 16 {s.push_str(&state.up);}
         }
         String::from(s)
     }
+
+    // gives us a random arrow string
+    fn arrow_gen_shake(count: i32, state: & mut GameState, add: &u32) -> String
+    { 
+        let mut s: String = "".to_owned();
+        if (count > state.random_numbers.len() as i32)
+        {
+                return "".to_string()
+        }
+
+        for x in 0..count as i32 {
+        let i = state.random_numbers[x as usize];
+        if i + add == 0 {s.push_str(&state.up);}
+        if i + add == 1 {s.push_str(&state.down);}
+        if i + add == 2 {s.push_str(&state.up);}
+        if i + add == 3 {s.push_str(&state.down);}
+        if i + add == 4 {s.push_str(&state.up);}
+        if i + add == 5 {s.push_str(&state.down);}
+        if i + add == 6 {s.push_str(&state.up);}
+        if i + add == 7 {s.push_str(&state.down);}
+        if i + add == 8 {s.push_str(&state.up);}
+        if i + add == 9 {s.push_str(&state.down);}
+        if i + add == 10 {s.push_str(&state.up);}
+        if i + add == 11 {s.push_str(&state.down);}
+        if i + add == 12 {s.push_str(&state.up);}
+        if i + add == 13 {s.push_str(&state.down);}
+        if i + add == 14 {s.push_str(&state.up);}
+        if i + add == 15 {s.push_str(&state.down);}
+        if i + add == 16 {s.push_str(&state.up);}
+        }
+        String::from(s)
+    }
+
 
     clear!(0xe7b84eff);
 
@@ -312,7 +473,7 @@ turbo::go!({
         {
             state.menu_y -= 1;
         }
-    } else if (state.menu_y < 290) {
+    } else if (state.menu_y < 300) {
         state.menu_y += 1;
     }
 
@@ -402,23 +563,33 @@ turbo::go!({
     text!("SCORE:", x = 380, y = 10, color = 0xff5e00ff, font = Font::XL);
     text!(&active_score_from_server.to_string(), x = 480, y = 10, color = 0xff5e00ff, font = Font::XL);
 
+    // draw the score 
+    text!("TIME REMAINING:", x = 235, y = 30, color = 0xff5e00ff, font = Font::XL);
+    text!(&remaining_time_from_server.to_string(), x = 480, y = 30, color = 0xff5e00ff, font = Font::XL);
+
+
     // check if this input is correct
     // player 1
     if state.player_num == 1 as i32 && state.current_char >= 2
     {        
         let cis = state.current_inputs.clone(); 
         let coas = current_order_arrows.clone();
+        
+        log!("{:?}", coas);
         let coa = &coas[..2];
+
 
         // check if coa starts with cis 
         if coa.starts_with(&cis)
         {
+            log!("huh");
             if (state.current_char >= 2)
             {
                 let i = 2;
                 let p_bytes = i.try_to_vec().unwrap();
                 os::client::exec(program_id, "submit-current-player", &p_bytes);
                 
+            log!("WAHG");
                 state.current_inputs.clear();
                 state.current_char = 0;
                 state.last_right_time = state.frame;
@@ -483,6 +654,15 @@ turbo::go!({
                 state.last_right_time = state.frame;
                 state.current_inputs.clear();
                 state.current_char = 0;
+
+                // new order!
+                log!("sending current order...");
+                // pick a random recipe
+                let mut i = rand() % (state.menu.len()) as u32;
+                log!("{}", i);
+                // i -= 1;
+                let current_order_bytes = state.menu[i as usize].name.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-order", &current_order_bytes);
             }
         } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
@@ -586,5 +766,18 @@ unsafe extern "C" fn submit_current_score() -> usize {
 
     return os::server::COMMIT;
 }
+
+#[export_name = "turbo/submit-remaining-time"]
+unsafe extern "C" fn submit_remaining_time() -> usize {
+    let time = os::server::command!(u32);
+    let file_path = format!("remaining time");
+
+    let Ok(_) = os::server::write!(&file_path, time) else {
+        return os::server::CANCEL;
+    };
+
+    return os::server::COMMIT;
+}
+
 
 
