@@ -31,7 +31,9 @@ turbo::init! {
         is_playing: bool,
         current_inputs: String,
         start_frame: u32,
-        current_char: u32
+        current_char: u32,
+        last_wrong_time: u32,
+        last_right_time: u32
     } = {
         Self { // when we define the struct we put the default values here
         frame: 0,
@@ -47,7 +49,9 @@ turbo::init! {
         is_playing: false,
         current_inputs: String::from(""),
         start_frame: 0,
-        current_char: 0
+        current_char: 0,
+        last_wrong_time: 0,
+        last_right_time: 0
         }
     }
 }
@@ -377,22 +381,25 @@ turbo::go!({
     {        
         let cis = state.current_inputs.clone(); 
         let coas = current_order_arrows.clone();
-        let coa = &coas[..1];
+        let coa = &coas[..2];
 
         // check if coa starts with cis 
         if coa.starts_with(&cis)
         {
-            // log!("YE");
-        }
-
-        if (state.current_char >= 2)
-        {
-            let i = 2;
-            let p_bytes = i.try_to_vec().unwrap();
-            os::client::exec(program_id, "submit-current-player", &p_bytes);
-            
+            if (state.current_char >= 2)
+            {
+                let i = 2;
+                let p_bytes = i.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-player", &p_bytes);
+                
+                state.current_inputs.clear();
+                state.current_char = 0;
+                state.last_right_time = state.frame;
+            }
+        } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
             state.current_char = 0;
+            state.last_wrong_time = state.frame;
         }
     }
 
@@ -401,22 +408,29 @@ turbo::go!({
     {
         let cis = state.current_inputs.clone(); 
         let coas = current_order_arrows.clone();
-        let coa = &coas[..3];
+        let coa = &coas[..4];
 
         // check if coa starts with cis 
         if coa.starts_with(&cis)
         {
-            // log!("YE");
-        }
-
-        if (state.current_char >= 4)
-        {
-            let i = 3;
-            let p_bytes = i.try_to_vec().unwrap();
-            os::client::exec(program_id, "submit-current-player", &p_bytes);
-            
+            if (state.current_char >= 4)
+            {
+                let i = 3;
+                let p_bytes = i.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-player", &p_bytes);
+                
+                state.current_inputs.clear();
+                state.current_char = 0;
+                state.last_right_time = state.frame;
+            }
+        } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
             state.current_char = 0;
+            state.last_wrong_time = state.frame;
+            // reset the player
+            let i = 1;
+            let p_bytes = i.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-current-player", &p_bytes);
         }
     }
 
@@ -425,32 +439,44 @@ turbo::go!({
     {
         let cis = state.current_inputs.clone(); 
         let coas = current_order_arrows.clone();
-        let coa = &coas[..5];
+        let coa = &coas[..6];
 
         // check if coa starts with cis 
         if coa.starts_with(&cis)
         {
-            // log!("YE");
-        }
-
-        if (state.current_char >= 6)
-        {
-            let i = 1;
-            let p_bytes = i.try_to_vec().unwrap();
-
-            let j = active_score_from_server + 1;
-            let j_bytes = j.try_to_vec().unwrap();
-            
-            os::client::exec(program_id, "submit-current-player", &p_bytes);
-            log!("A");
-            os::client::exec(program_id, "submit-current-score", &j_bytes);
-            log!("B");
-            
+            if (state.current_char >= 6)
+            {
+                let i = 1;
+                let p_bytes = i.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-player", &p_bytes);
+                
+                let j = active_score_from_server + 1;
+                let j_bytes = j.try_to_vec().unwrap();
+                os::client::exec(program_id, "submit-current-score", &j_bytes);
+                state.last_right_time = state.frame;
+                state.current_inputs.clear();
+                state.current_char = 0;
+            }
+        } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
             state.current_char = 0;
-        } 
+            state.last_wrong_time = state.frame;
+            // reset the player
+            let i = 1;
+            let p_bytes = i.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-current-player", &p_bytes);
+        }
     }
 
+    // do we render our WRONG text
+    if (state.frame <= state.last_wrong_time + 80) {
+        text!("!! W R O N G !!", x = 220.0 + (val.sin() * 10.0), y = 160.0 + (val.sin() * 2.0), color = 0xff0000ff, font = Font::XL);
+    }
+
+    // do we render our YAY text
+    if (state.frame <= state.last_right_time + 80) {
+        text!("!! YAAYYY !!", x = 220.0 + (val.sin() * 10.0), y = 160.0 + (val.sin() * 2.0), color = 0x14ff00ff, font = Font::XL);
+    }
     // at the end of the frame save the state
     state.frame += 1;
     state.save();
