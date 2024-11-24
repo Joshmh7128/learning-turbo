@@ -37,7 +37,18 @@ turbo::init! {
         show_menu: bool,
         menu_x: u32,
         menu_y: u32,
-        remaining_time: u32
+        remaining_time: u32,
+        hands_x: u32,
+        hands_y: u32,
+        hands_x_d: u32,
+        hands_y_d: u32,
+        last_success: u32,
+        last_failure: u32,
+        foodx: u32,
+        foody: u32,
+        foodx_d: u32,
+        foody_d: u32,
+        food_show_time:u32
     } = {
         Self { // when we define the struct we put the default values here
         frame: 0,
@@ -56,10 +67,21 @@ turbo::init! {
         current_char: 0,
         last_wrong_time: 0,
         last_right_time: 0,
-        show_menu: false,
+        show_menu: true,
         menu_x: 20,
-        menu_y: 100,
-        remaining_time: 60
+        menu_y: 120,
+        remaining_time: 60,
+        hands_x: 250,
+        hands_y: 210,
+        hands_x_d: 250,
+        hands_y_d: 210,
+        last_success: 0,
+        last_failure: 0,
+        foodx: 300,
+        foody: 120,
+        foodx_d: 300,
+        foody_d: 160,
+        food_show_time: 120
         }
     }
 }
@@ -190,6 +212,8 @@ turbo::go!({
     // if we have not initialized
     if (!state.initialized && num != 0 && state.is_playing)
     {
+        
+        os::client::exec(program_id, "random", &[]);
         // take the number and make it a string then slice the string
         let snum: String = num.to_string(); // to bum >:D
 
@@ -463,7 +487,6 @@ turbo::go!({
         String::from(s)
     }
 
-
     clear!(0xe7b84eff);
 
     // set menu positions
@@ -476,6 +499,10 @@ turbo::go!({
     } else if (state.menu_y < 300) {
         state.menu_y += 1;
     }
+
+    
+    // draw background
+    sprite!("BURGER bg", x = 212, y = 0, scale_x = 1.5, scale_y = 1.5);
 
     // draw the menu background
     rect!(w = 180, h = 110, x = state.menu_x - 10, y = state.menu_y - 10, color = 0xcb5917ff);
@@ -493,8 +520,8 @@ turbo::go!({
    
     // draw the current order
     let co = current_order_from_server.to_string();
-    text!("Current Order:", x = 20, y = 10, font = Font::XL);
-    text!(&co, x = 20, y = 30, font = Font::XL);
+    text!("Current Order:", x = 20, y = 10, font = Font::XL, color = 0xff0000ff);
+    text!(&co, x = 20, y = 30, font = Font::XL, color = 0xff0000ff);
     text!("Active Player:", x = 0, y = 0);
     text!(&active_player_from_server.to_string(), x = 0, y = 10);
 
@@ -512,7 +539,7 @@ turbo::go!({
     let val: f32 = state.frame as f32;
 
     // if we are the active player
-    if (active_player_from_server == state.player_num as u32)
+    if (active_player_from_server == state.player_num as u32 && remaining_time_from_server > 0)
     {
         text!("MAKE THE ORDER!", x = 20, y = (60 + (val.sin() * 2.0) as u32), color = 0xff0000ff, font = Font::XL);
         if (state.player_num == 1) { text!("FIRST TWO STEPS!", x = 20, y = (80 + (val.sin() * 2.0) as u32), color = 0xff0000ff, font = Font::XL); }
@@ -534,6 +561,13 @@ turbo::go!({
             state.current_inputs.clear();
             state.current_char = 0;
 
+            // get a new random number
+            os::client::exec(program_id, "random", &[]);
+            let rand_data = os::client::watch_file(program_id, "random num").data;
+            if let Some(file) = rand_data {
+                num = u32::try_from_slice(&file.contents).unwrap_or(0);
+            }
+
             // reset score
             let j = 0;
             let j_bytes = j.try_to_vec().unwrap();
@@ -544,28 +578,44 @@ turbo::go!({
 
             let current_order_bytes = "".try_to_vec().unwrap();
             os::client::exec(program_id, "submit-current-order", &current_order_bytes);
+            
+            let z = 60;
+            let time_bytes = z.try_to_vec().unwrap();
+            os::client::exec(program_id, "submit-remaining-time", &time_bytes);
         }
 
         // use the b button to open and close the menu
         if gamepad(0).y.just_pressed() {
             state.show_menu = !state.show_menu;
+
         }
     }
 
+    // score debug
+    if (gamepad(0).select.just_pressed())
+    {
+        // reset score
+        let j = active_score_from_server + 1;
+        let j_bytes = j.try_to_vec().unwrap();
+        os::client::exec(program_id, "submit-current-score", &j_bytes);
+    }
 
     // draw our inputs on the screen
     // log!("{}", val.sin().to_string());
     text!(r"\/ MAKE THE FOOD \/", x = 200, y = (120 + (val.sin() * 2.0) as u32), color = 0xff5e00ff, font = Font::XL);
-    text!(&state.current_inputs.to_string(), x = 200, y = 150, color = 0xff5e00ff, font = Font::XL);
+    text!(&state.current_inputs.to_string(), x = 380, y = 200, color = 0xff5e00ff, font = Font::XL);
     // text!(&state.current_char.to_string(), x = 200, y = 160, color = 0xff5e00ff, font = Font::XL);
 
-    // draw the score 
-    text!("SCORE:", x = 380, y = 10, color = 0xff5e00ff, font = Font::XL);
-    text!(&active_score_from_server.to_string(), x = 480, y = 10, color = 0xff5e00ff, font = Font::XL);
+    // draw a rect so we can read the time remaining
+    rect!(w = 300, h = 20, x = 230, y = 28, color = 0xffffffff);
 
     // draw the score 
-    text!("TIME REMAINING:", x = 235, y = 30, color = 0xff5e00ff, font = Font::XL);
-    text!(&remaining_time_from_server.to_string(), x = 480, y = 30, color = 0xff5e00ff, font = Font::XL);
+    text!("SCORE:", x = 300, y = 10, color = 0xff0000ff, font = Font::XL);
+    text!(&active_score_from_server.to_string(), x = 390, y = 10, color = 0xff0000ff, font = Font::XL);
+
+    // draw the score 
+    text!("TIME REMAINING:", x = 235, y = 30, color = 0xfff7000ff, font = Font::XL);
+    text!(&remaining_time_from_server.to_string(), x = 480, y = 30, color = 0xff7000ff, font = Font::XL);
 
 
     // check if this input is correct
@@ -588,16 +638,20 @@ turbo::go!({
                 let i = 2;
                 let p_bytes = i.try_to_vec().unwrap();
                 os::client::exec(program_id, "submit-current-player", &p_bytes);
-                
+                state.last_success = state.frame;
             log!("WAHG");
                 state.current_inputs.clear();
                 state.current_char = 0;
                 state.last_right_time = state.frame;
+                state.foodx = state.foodx_d;
+                state.foody = state.foody_d;
             }
         } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
             state.current_char = 0;
             state.last_wrong_time = state.frame;
+            state.foodx = state.foodx_d;
+            state.foody = state.foody_d;
         }
     }
 
@@ -620,11 +674,15 @@ turbo::go!({
                 state.current_inputs.clear();
                 state.current_char = 0;
                 state.last_right_time = state.frame;
+                state.foodx = state.foodx_d;
+                state.foody = state.foody_d;
             }
         } else if !coa.starts_with(&cis) {
             state.current_inputs.clear();
             state.current_char = 0;
             state.last_wrong_time = state.frame;
+            state.foodx = state.foodx_d;
+            state.foody = state.foody_d;
             // reset the player
             let i = 1;
             let p_bytes = i.try_to_vec().unwrap();
@@ -652,6 +710,8 @@ turbo::go!({
                 let j_bytes = j.try_to_vec().unwrap();
                 os::client::exec(program_id, "submit-current-score", &j_bytes);
                 state.last_right_time = state.frame;
+                state.foodx = state.foodx_d;
+                state.foody = state.foody_d;
                 state.current_inputs.clear();
                 state.current_char = 0;
 
@@ -668,6 +728,8 @@ turbo::go!({
             state.current_inputs.clear();
             state.current_char = 0;
             state.last_wrong_time = state.frame;
+            state.foodx = state.foodx_d;
+            state.foody = state.foody_d;
             // reset the player
             let i = 1;
             let p_bytes = i.try_to_vec().unwrap();
@@ -675,6 +737,291 @@ turbo::go!({
         }
     }
 
+
+    // do the seconds countdown
+    if (state.player_num == 1 && remaining_time_from_server > 0)
+    {
+        if (state.frame % 60 == 0)
+        {
+            let i = remaining_time_from_server - 1;
+            let time_bytes = i.try_to_vec().unwrap();
+            // now that we have our recipes, send them to the server for others to read
+            os::client::exec(program_id, "submit-remaining-time", &time_bytes);
+        }
+    }
+
+    // draw the hands!
+    sprite!("hand pixels", x = state.hands_x + (val.sin() * 1.0) as u32, y = state.hands_y + (val.sin() * 2.0) as u32, scale_x = 1.5, scale_y = 1.5);
+
+    // make the moves
+    if gamepad(0).left.pressed() { state.hands_x = 200; }
+    if gamepad(0).up.pressed() { state.hands_y = 100;  }
+    if gamepad(0).right.pressed() { state.hands_x = 350; }
+    if gamepad(0).down.pressed() { state.hands_y = 350;}
+
+    if (state.hands_x > state.hands_x_d) { state.hands_x -= 20}
+    if (state.hands_x < state.hands_x_d) { state.hands_x += 20}
+    if (state.hands_y > state.hands_y_d) { state.hands_y -= 10}
+    if (state.hands_y < state.hands_y_d) { state.hands_y += 10}
+
+    // move the food if we recently succeeded
+    if (state.frame >= state.last_right_time + 30)
+    {
+        state.foodx += 5;
+    }
+
+    // sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+    // what are we making?
+    if (current_order_from_server == "hamburger")
+    {
+        // if we're player 1 and we succeed with the burger
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 1 and we fail with the burger
+        if (state.player_num == 1 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the burger
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice true", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we fail with the burger
+        if (state.player_num == 2 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 3 and we succeed with the burger
+        if (state.player_num == 3 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("meal success", x = state.foodx, y = state.foody - 50, scale_x = 4, scale_y = 4);
+        }
+
+        // if we're player 3 and we fail with the burger
+        if (state.player_num == 3 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixbun top", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+    }
+
+    if (current_order_from_server == "double")
+    {
+        // if we're player 1 and we succeed with the burger
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 1 and we fail with the burger
+        if (state.player_num == 1 && state.frame < state.last_wrong_time + state.food_show_time)
+        { 
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the burger
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice true", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we fail with the burger
+        if (state.player_num == 2 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+           sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 3 and we succeed with the burger
+        if (state.player_num == 3 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("meal success", x = state.foodx-30, y = state.foody - 50, scale_x = 4, scale_y = 4);
+        }
+
+        // if we're player 3 and we fail with the burger
+        if (state.player_num == 3 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixbun top", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixcheesefalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody + 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+    }
+
+    if (current_order_from_server == "cheeseburger")
+    {
+        // if we're player 1 and we succeed with the burger
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 1 and we fail with the burger
+        if (state.player_num == 1 && state.frame < state.last_wrong_time + state.food_show_time)
+        { 
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the burger
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice true", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixcheesetrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgertrue", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we fail with the burger
+        if (state.player_num == 2 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixcheesefalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody - 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 3 and we succeed with the burger
+        if (state.player_num == 3 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("meal success", x = state.foodx, y = state.foody - 50, scale_x = 4, scale_y = 4);
+        }
+
+        // if we're player 3 and we fail with the burger
+        if (state.player_num == 3 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerpixbun top", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixlettice false", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixcheesefalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixburgerfalse", x = state.foodx, y = state.foody + 10, scale_x = 2, scale_y = 2);
+            sprite!("burgerpixbottom bun", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+    }
+
+    if (current_order_from_server == "french_fries")
+    {
+        // if we're player 1 and we succeed with the burger
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerfries1", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 1 and we fail with the burger
+        if (state.player_num == 1 && state.frame < state.last_wrong_time + state.food_show_time)
+        { 
+            sprite!("burgerfriesfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the burger
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("burgerfries2", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+           }
+
+        // if we're player 2 and we fail with the burger
+        if (state.player_num == 2 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerfriesfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 3 and we succeed with the burger
+        if (state.player_num == 3 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("meal success", x = state.foodx, y = state.foody - 50, scale_x = 4, scale_y = 4);
+        }
+
+        // if we're player 3 and we fail with the burger
+        if (state.player_num == 3 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("burgerfriesfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+    }
+
+    if (current_order_from_server == "shake")
+    {
+        // if we're player 1 and we succeed with the shake
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("drinkfill1", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+        
+        // if we're player 1 and we succeed with the shake
+        if (state.player_num == 1 && state.frame < state.last_right_time + state.food_show_time/2)
+        {
+            sprite!("drinkempty", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 1 and we fail with the shake
+        if (state.player_num == 1 && state.frame < state.last_wrong_time + state.food_show_time)
+        { 
+            sprite!("drinkfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the shake
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("drinkfill3", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 2 and we succeed with the shake
+        if (state.player_num == 2 && state.frame < state.last_right_time + state.food_show_time/2)
+        {
+            sprite!("drinkfill2", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+        
+        // if we're player 2 and we fail with the shake
+        if (state.player_num == 2 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("drinkfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+
+        // if we're player 3 and we succeed with the shake
+        if (state.player_num == 3 && state.frame < state.last_right_time + state.food_show_time)
+        {
+            sprite!("meal_success", x = state.foodx, y = state.foody - 50, scale_x = 4, scale_y = 4);
+        }
+
+        // if we're player 3 and we fail with the shake
+        if (state.player_num == 3 && state.frame < state.last_wrong_time + state.food_show_time)
+        {
+            sprite!("drinkfail", x = state.foodx, y = state.foody, scale_x = 2, scale_y = 2);
+        }
+    }
+
+
+    
     // do we render our WRONG text
     if (state.frame <= state.last_wrong_time + 80) {
         text!("!! W R O N G !!", x = 220.0 + (val.sin() * 10.0), y = 160.0 + (val.sin() * 2.0), color = 0xff0000ff, font = Font::XL);
@@ -684,6 +1031,42 @@ turbo::go!({
     if (state.frame <= state.last_right_time + 80) {
         text!("!! YAAYYY !!", x = 220.0 + (val.sin() * 10.0), y = 160.0 + (val.sin() * 2.0), color = 0x14ff00ff, font = Font::XL);
     }
+
+
+    // do we render our WRONG text
+    if (remaining_time_from_server <= 0) {
+
+        rect!(w = 500, h = 100, x = 200, y = 140, color = 0xff0000ff);
+        rect!(w = 500, h = 80, x = 210, y = 150, color = 0xffffffff);
+        text!("GAME OVER", x = 220.0, y = 160.0 + (val.sin() * 1.0), color = 0xff0000ff, font = Font::XL);
+        text!("SCORE:", x = 220.0, y = 180.0, color = 0xff0000ff, font = Font::XL);
+        text!(&active_score_from_server.to_string(), x = 350.0, y = 180.0, color = 0xff0000ff, font = Font::XL);
+        text!("RATING:", x = 220.0, y = 200.0, color = 0xff0000ff, font = Font::XL);
+        
+        if (active_score_from_server < 5)
+        {
+            text!("LITERAL TRASH WTF LOL", x = 340.0, y = 205.0, color = 0xff0000ff, font = Font::L);
+        }
+
+        if (active_score_from_server >= 5 && active_score_from_server < 7)
+        {
+            text!("EMPLOYABLE I GUESS", x = 340.0, y = 205.0, color = 0xff9600ff, font = Font::L);
+        }
+
+        if (active_score_from_server >= 7 && active_score_from_server < 10)
+        {
+            text!("BURGER-MEISTER", x = 340.0, y = 205.0, color = 0xd6ff00ff, font = Font::L);
+        }
+        
+        if (active_score_from_server >= 10)
+        {
+            text!("GODBURGER", x = 340.0, y = 205.0, color = 0xd39ff00ff, font = Font::L);
+        }
+    }
+
+    
+    
+
     // at the end of the frame save the state
     state.frame += 1;
     state.save();

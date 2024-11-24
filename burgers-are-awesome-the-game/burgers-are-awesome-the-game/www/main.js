@@ -11,7 +11,7 @@ const APP_DESCRIPTION = "Trash Machine!";
 const RESOLUTION = [512, 288];
 const WASM_SRC = "burgers_are_awesome_the_game.wasm";
 
-const SPRITES = [];
+const SPRITES = ["./sprites/BURGER bg.png","./sprites/BURGER MENU.png","./sprites/burgerfail.png","./sprites/burgerfries1.png","./sprites/burgerfries2.png","./sprites/burgerfries3.png","./sprites/burgerfriesfail.png","./sprites/burgerfrieswin.png","./sprites/burgerpixbottom bun.png","./sprites/burgerpixbun top.png","./sprites/burgerpixburgerfalse.png","./sprites/burgerpixburgertrue.png","./sprites/burgerpixcheesefalse.png","./sprites/burgerpixcheesetrue.png","./sprites/burgerpixlettice false.png","./sprites/burgerpixlettice true.png","./sprites/burgerwin.png","./sprites/drinkempty.png","./sprites/drinkfail.png","./sprites/drinkfill1.png","./sprites/drinkfill2.png","./sprites/drinkfill3.png","./sprites/drinkwin.png","./sprites/hand pixels.png","./sprites/meal success.png","./sprites/mealfail.png",];
 
 const SHADERS = [
 
